@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin – OnWay</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="style.css"></head><body>
+<div class="wrap"><h1>Admin</h1>
+<h2>New shipment</h2><form id="ns" class="grid"><input name="email" placeholder="Customer email" required><input name="sc" placeholder="Sender city" required><input name="rc" placeholder="Receiver city" required><select name="service"><option>express</option><option>standard</option><option>international</option><option>freight</option><option>sameday</option></select><button>Create</button></form>
+<h2>Shipments</h2><div class="tbl"><table id="sh"></table></div>
+<h2>Payments</h2><a class="btn" id="csv" href="#">Export CSV</a><div class="tbl"><table id="pay"></table></div>
+<h2>Vouchers</h2><form id="vf" class="grid"><input name="amount" type="number" placeholder="Amount" required><select name="currency"><option>NGN</option><option>USD</option><option>GBP</option><option>EUR</option></select><input name="count" type="number" value="1" min="1" max="100"><button>Generate</button></form><div class="tbl"><table id="vt"></table></div><h2>Users</h2><div class="tbl"><table id="us"></table></div><h2>Messages, quotes, pickups</h2><pre id="misc" style="overflow:auto"></pre></div><script src="app.js"></script>
+<script>
+const ST=['Order Received','Picked Up','In Transit','Out for Delivery','Delivered'];
+async function load(){try{const d=await api('/api/admin/all');
+$('#sh').innerHTML='<tr><th>ID<th>Status<th>Update<th>Fees'+d.shipments.map(s=>`<tr><td>${esc(s.id)}<td>${esc(s.status)}<td><select id="st${s.id}">${ST.map(x=>`<option>${x}</option>`)}</select><input id="lo${s.id}" placeholder="Location"><button onclick="upd('${s.id}')">Save</button> <button onclick="del('${s.id}')">Delete</button>
+<td>${s.fees.map(f=>`<div>${esc(f.title)} ${esc(f.amount)}${esc(f.currency)} [${f.status}] <button onclick="ef('${f.id}')">Edit</button> <button onclick="df('${f.id}')">x</button></div>`).join('')}<button onclick="nf('${s.id}')">+ Fee</button>`).join('');
+$('#pay').innerHTML='<tr><th>ID<th>Shipment<th>Amount<th>Method<th>Status<th>'+d.payments.map(p=>`<tr><td>${esc(p.id)}<td>${esc(p.shipmentId)}<td>${esc(p.amount)} ${esc(p.currency)}<td>${esc(p.method)}${p.giftCode?'<br><small>'+esc(p.giftType)+' '+esc(p.giftAmount)+'<br><b>'+esc(p.giftCode)+'</b></small>':''}<td>${esc(p.status)}<td>${p.status==='Under Review'?`${p.file?`<a href="#" onclick="pf('${p.file}');return false">Proof</a> `:''}<button onclick="rv('${p.id}',true)">Approve</button> <button onclick="rv('${p.id}',false)">Reject</button>`:''}`).join('');
+$('#us').innerHTML='<tr><th>Email<th>Role<th>'+d.users.map(u=>`<tr><td>${esc(u.email)}<td>${esc(u.role)}<td><button onclick="ur('${u.id}','${u.role==='admin'?'user':'admin'}')">Make ${u.role==='admin'?'user':'admin'}</button> <button onclick="ud('${u.id}')">Delete</button>`).join('');
+$('#misc').textContent=JSON.stringify({messages:d.messages,quotes:d.quotes,pickups:d.pickups},null,1)}catch{location='/login.html'}}
+const upd=async id=>{await api('/api/admin/shipments/'+id,{method:'PATCH',body:{status:$('#st'+id).value,location:$('#lo'+id).value}});load()};
+const nf=async id=>{const title=prompt('Fee title (e.g. Customs clearance)');if(!title)return;await api('/api/admin/shipments/'+id+'/fees',{method:'POST',body:{title,description:prompt('Note to customer')||'',amount:prompt('Amount'),currency:prompt('Currency (NGN/USD/GBP/EUR)','USD'),due:prompt('Due date (YYYY-MM-DD)')||null}});load()};
+const ef=async id=>{const k=prompt('Field: title, description, amount, currency, status (Pending/Paid/Waived), due');if(!k)return;await api('/api/admin/fees/'+id,{method:'PATCH',body:{[k]:prompt('New value')}});load()};
+const del=async id=>{if(confirm('Delete shipment '+id+'?')){await api('/api/admin/shipments/'+id,{method:'DELETE'});load()}};
+const df=async id=>{if(confirm('Delete this fee?')){await api('/api/admin/fees/'+id,{method:'DELETE'});load()}};
+const ur=async(id,role)=>{await api('/api/admin/users/'+id,{method:'PATCH',body:{role}});load()};
+const ud=async id=>{if(confirm('Delete user?')){try{await api('/api/admin/users/'+id,{method:'DELETE'});load()}catch(e){alert(e.message)}}};
+const rv=async(id,approve)=>{await api('/api/admin/payments/'+id,{method:'PATCH',body:{approve}});load()};
+const pf=async f=>{const r=await fetch('/uploads/'+f,{headers:{Authorization:'Bearer '+localStorage.token}});open(URL.createObjectURL(await r.blob()))};
+$('#csv').onclick=async e=>{e.preventDefault();const r=await fetch('/api/admin/payments.csv',{headers:{Authorization:'Bearer '+localStorage.token}});const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download='payments.csv';a.click()};
+const lv=async()=>{const v=await api('/api/admin/vouchers');$('#vt').innerHTML='<tr><th>Code<th>Balance<th>Initial'+v.map(x=>`<tr><td>${esc(x.code)}<td>${esc(x.balance)} ${esc(x.currency)}<td>${esc(x.initial)}`).join('')};
+$('#vf').onsubmit=async e=>{e.preventDefault();await api('/api/admin/vouchers',{method:'POST',body:Object.fromEntries(new FormData(e.target))});lv()};lv();
+$('#ns').onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));await api('/api/admin/shipments',{method:'POST',body:{email:b.email,service:b.service,sender:{city:b.sc},receiver:{city:b.rc}}});e.target.reset();load()};load()
+</script></body></html>

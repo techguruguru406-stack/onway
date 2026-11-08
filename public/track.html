@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Track a Shipment – OnWay</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="style.css"></head><body>
+<div class="wrap"><h1>Track your shipment</h1><form class="row" id="f" style="margin:0"><input id="id" placeholder="Tracking ID" required><button>Track</button></form><div id="out"></div></div><script src="app.js"></script>
+<script>
+let info={};api('/api/pay/info').then(d=>info=d);
+async function go(id){try{const s=await api('/api/track/'+encodeURIComponent(id));
+ const pend=s.fees.filter(f=>f.status==='Pending');
+ $('#out').innerHTML=pend.map(f=>`<div class="banner"><b>⚠ Payment Required: ${esc(f.title)}</b><p>${esc(f.description)}</p><p><b>${esc(f.amount)} ${esc(f.currency)}</b>${f.due?' · Due '+esc(f.due):''}</p><button onclick="pay('${f.id}')">Pay Now</button><div id="p${f.id}"></div></div>`).join('')+
+ `<h2>${esc(s.id)} — ${esc(s.status)}</h2><ul class="tl">${s.events.map(e=>`<li><b>${esc(e.status)}</b><br>${new Date(e.at).toLocaleString()} ${esc(e.location)}</li>`).join('')}</ul>`+
+ s.fees.filter(f=>f.status!=='Pending').map(f=>`<p>${esc(f.title)}: ${esc(f.status)}</p>`).join('')}catch(e){$('#out').innerHTML='<p>'+esc(e.message)+'</p>'}}
+function pay(fid){$('#p'+fid).innerHTML=`<label>Method</label><select id="m${fid}" onchange="meth('${fid}')"><option value="">Choose…</option>${info.card?'<option value="card">Card</option>':''}<option value="voucher">OnWay voucher code</option><option value="bank">Bank transfer (upload proof)</option><option value="crypto">Crypto (upload proof)</option><option value="giftcard">Gift card</option></select><div id="x${fid}"></div>`}
+async function meth(fid){const m=$('#m'+fid).value,x=$('#x'+fid);if(m==='card'){const r=await api('/api/fees/'+fid+'/card',{method:'POST'});location=r.url}
+ else if(m==='voucher')x.innerHTML=`<input id="v${fid}" placeholder="OW-XXXXXX-XXXXXX"><button onclick="vc('${fid}')">Redeem</button>`;
+ else if(m==='giftcard')x.innerHTML=`<select id="gt${fid}"><option>Amazon</option><option>iTunes / Apple</option><option>Steam</option><option>Google Play</option><option>Other</option></select><input id="ga${fid}" type="number" placeholder="Card amount"><input id="gc${fid}" placeholder="Gift card code"><button onclick="gift('${fid}')">Submit</button>`;
+ else if(m)x.innerHTML=`<p>${m==='bank'?esc(info.bank):'Contact support for the wallet address.'}</p><input type="file" id="u${fid}" accept="image/*,.pdf"><button onclick="proof('${fid}','${m}')">Submit proof</button>`}
+async function vc(fid){try{const r=await api('/api/fees/'+fid+'/voucher',{method:'POST',body:{code:$('#v'+fid).value}});$('#x'+fid).innerHTML='Paid ✔ <a href="/api/receipts/'+esc(r.receipt)+'">Receipt</a>'}catch(e){alert(e.message)}}
+async function gift(fid){try{const r=await api('/api/fees/'+fid+'/giftcard',{method:'POST',body:{type:$('#gt'+fid).value,amount:$('#ga'+fid).value,code:$('#gc'+fid).value}});$('#x'+fid).innerHTML=esc(r.message)}catch(e){alert(e.message)}}
+async function proof(fid,m){const fd=new FormData();fd.append('method',m);fd.append('proof',$('#u'+fid).files[0]);try{const r=await api('/api/fees/'+fid+'/proof',{method:'POST',body:fd});$('#x'+fid).innerHTML=esc(r.message)}catch(e){alert(e.message)}}
+$('#f').onsubmit=e=>{e.preventDefault();go($('#id').value)};const q=new URLSearchParams(location.search);
+if(q.get('reference'))api('/api/fees/verify/'+q.get('reference')).catch(()=>{});if(q.get('id')){$('#id').value=q.get('id');go(q.get('id'))}
+</script></body></html>

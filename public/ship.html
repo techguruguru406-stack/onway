@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Create Shipment – OnWay</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="style.css"></head><body>
+<div class="wrap"><h1>Create Shipment</h1><form id="f"><h3>Sender</h3><input name="sn" placeholder="Name" required><input name="sp" placeholder="Phone"><input name="sa" placeholder="Address" required><input name="sc" placeholder="City" required>
+<h3>Receiver</h3><input name="rn" placeholder="Name" required><input name="rp" placeholder="Phone"><input name="ra" placeholder="Address" required><input name="rc" placeholder="City" required>
+<h3>Package</h3><input name="weight" type="number" step="0.1" min="0.1" placeholder="Weight (kg)" required><input name="desc" placeholder="Contents">
+<label>Service</label><select name="service"><option>express</option><option>standard</option><option>international</option><option>freight</option><option>sameday</option></select>
+<label>Currency</label><select name="currency"><option value="NGN">₦ NGN</option><option>USD</option><option>GBP</option><option>EUR</option></select>
+<label>Payment</label><select name="payMethod"><option value="bank">Bank transfer</option><option value="cash">Cash at pickup</option></select><br><button>Create shipment</button></form><p id="m"></p></div><script src="app.js"></script>
+<script>$('#f').onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));
+try{const r=await api('/api/shipments/full',{method:'POST',body:{service:b.service,currency:b.currency,payMethod:b.payMethod,sender:{name:b.sn,phone:b.sp,address:b.sa,city:b.sc},receiver:{name:b.rn,phone:b.rp,address:b.ra,city:b.rc},pkg:{weight:b.weight,desc:b.desc}}});
+location='/label.html?id='+r.id}catch(x){$('#m').textContent=x.message==='Login required'?'Please log in first.':x.message}}</script></body></html>
